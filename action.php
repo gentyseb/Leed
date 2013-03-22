@@ -9,62 +9,115 @@
 if(!ini_get('safe_mode')) @set_time_limit(0);
 require_once("common.php");
 
+///@TODO: déplacer dans common.php?
+$commandLine = 'cli'==php_sapi_name();
 
+if ($commandLine) {
+	$action = 'commandLine';
+} else {
+	$action = @$_['action'];
+}
+///@TODO: pourquoi ne pas refuser l'accès dès le début ?
+$syncCode = $configurationManager->get('synchronisationCode');
 
 //Execution du code en fonction de l'action
-switch ($_['action']){
-
+switch ($action){
+	case 'commandLine':
 	case 'synchronize':
-		if (ob_get_level() == 0) ob_start();
-		require_once("SimplePie.class.php");
-
-		
-		echo '<link rel="stylesheet" href="templates/marigolds/css/style.css"><ul style="font-family:Verdana;">';
-		echo str_pad('',4096)."\n";ob_flush();flush();
-
-		if (isset($_['code']) && $configurationManager->get('synchronisationCode')!=null && $_['code'] == $configurationManager->get('synchronisationCode')){
-
+		/**@TODO: (peut-être)
+		- verrouiller la màj, du moins empêcher deux mises à jour concurrentes
+		  de se marcher dessus.
+		- possibilité de rendre le log cli moins verbeux, voire silencieux tant
+		  qu'il n'y a pas d'erreur.
+		- un log cli aussi pour l'accès cron via http.
+		- rendre moins moche les sorties textes avec les cas cli/non-cli. Mais
+		  d'abord attendre la stabilisation du rendu, l'interfaçage avec les
+		  templates.
+		- paralléliser les flux
+		- mode détaché optionnel : un processus/cron attend l'ordre de màj
+		*/
+	
+		// Au moins une méthode d'authentification doit fonctionner
+		switch(true) {
+			case false!=$myUser:
+			case @$_['code'] == $syncCode:
+			case $commandLine:
+				break;
+			default:
+				die('Vous devez vous connecter pour cette action.');
+		}
+		Functions::triggerDirectOutput();
+				
+		// On ne devrait pas mettre de style ici.
+		if (!$commandLine)
+			echo "
+				<style>
+					dd {
+						margin-bottom: 1em;
+					}
+					a {
+						color:#F16529;
+					}
+				</style>\n";
 		$synchronisationType = $configurationManager->get('synchronisationType');
 		$maxEvents = $configurationManager->get('feedMaxEvents');
-
-		
-
-			echo '<h3>Synchronisation du '.date('d/m/Y H:i:s').'</h3>';
-			echo '<hr/>';
-			echo str_pad('',4096)."\n";ob_flush();flush();
-
-		if($synchronisationType=='graduate'){
+		if('graduate'==$synchronisationType){
+			// sélectionne les 10 plus vieux flux
 			$feeds = $feedManager->loadAll(null,'lastupdate','10');
-			echo 'Type gradué...<br/>';
-			echo str_pad('',4096)."\n";ob_flush();flush();
 		}else{
+			// sélectionne tous les flux, triés par le nom
 			$feeds = $feedManager->populate('name');
-			echo 'Type complet...<br/>';
-			echo str_pad('',4096)."\n";ob_flush();flush();
-		}	
-			
-			echo count($feeds).' Flux à synchroniser...<br/>';
-			echo str_pad('',4096)."\n";ob_flush();flush();
-		foreach ($feeds as $feed) {
-			echo date('H:i:s').' - Flux '.$feed->getName().' ('.$feed->getUrl().') parsage des flux...<br/>';
-			echo str_pad('',4096)."\n";ob_flush();flush();
-			$feed->parse();
-			echo str_pad('',4096)."\n";ob_flush();flush();
-			echo date('H:i:s').' - Flux '.$feed->getName().' ('.$feed->getUrl().') supression des vieux evenements...<br/>';
-			echo str_pad('',4096)."\n";ob_flush();flush();
-			if($maxEvents!=0) $feed->removeOldEvents($maxEvents);
-			echo date('H:i:s').' - Flux '.$feed->getName().' ('.$feed->getUrl().') terminé<br/>';
-			echo str_pad('',4096)."\n";ob_flush();flush();
 		}
-			echo date('H:i:s').' - Synchronisation terminée ( '.number_format(microtime(true)-$start,3).' secondes )<br/>';
-		echo str_pad('',4096)."\n";ob_flush();flush();
-
-	}else{
-		echo 'Code de synchronisation incorrect ou non spécifié';
-	}
-
-		ob_end_flush();
-
+		if (!$commandLine) echo "<dl>\n";
+		$nbErrors = 0;
+		$nbOk = 0;
+		$nbTotal = 0;
+		foreach ($feeds as $feed) {
+			$nbTotal++;
+			if ($feed->parse()) { // It's ok
+				$errors = array();
+				$style = '';
+				$nbOk++;
+			} else {
+				// tableau au cas où il arrive plusieurs erreurs
+				$errors = array($feed->getError());
+				$style = 'style="font-weight:bold" ';
+				$nbErrors++;
+			}
+			$feedName = $feed->getName();
+			$feedUrl = $feed->getUrl();
+			if ($commandLine) {
+				echo date('d/m/Y H:i:s')." $feedName\n";
+				echo "$feedUrl\n";
+			} else {
+				echo "<dt><a {$style} href='{$feedUrl}'>{$feedName}</a></dt>\n";
+			}
+			foreach($errors as $error) {
+				if ($commandLine)
+					echo "$error\n";
+				else
+					echo "<dd>$error</dd>\n";
+			}
+			if ($commandLine) echo "\n";
+			if($maxEvents!=0) $feed->removeOldEvents($maxEvents);
+		}
+		assert('$nbTotal==$nbOk+$nbErrors');
+		if ($commandLine) {
+			echo "Synchronisation terminée\n";
+			echo "\t{$nbErrors}\terreur(s)\n";
+			echo "\t{$nbOk}\tbon(s)\n";
+			echo "\t{$nbTotal}\tau total\n";
+		} else {
+			echo "</dl>\n";
+			echo "<div id='syncSummary'\n";
+			echo "<p>Synchronisation terminée.</p>\n";
+			echo "<ul>\n";
+			echo "<li>{$nbErrors} erreur(s)\n";
+			echo "<li>{$nbOk} bon(s)\n";
+			echo "<li>{$nbTotal} au total\n";
+			echo "</ul>\n";
+			echo "</div>\n";
+		}
 	break;
 
 
@@ -189,6 +242,7 @@ switch ($_['action']){
 	break;
 
 	case 'importFeed':
+		// On ne devrait pas mettre de style ici.
 		echo '<link rel="stylesheet" href="templates/marigolds/css/style.css">
 		<style>
 		a{
@@ -199,7 +253,11 @@ switch ($_['action']){
 		if(!isset($_POST['importButton'])) break;
 		$opml = new Opml();
 		echo "<h3>Importation</h3><p>En cours...</p>\n";
-		$errorOutput = $opml->import($_FILES['newImport']['tmp_name']);
+		try {
+			$errorOutput = $opml->import($_FILES['newImport']['tmp_name']);
+		} catch (Exception $e) {
+			$errorOutput = array($e->getMessage());
+		}
 		if (empty($errorOutput)) {
 			echo "<p>L'import s'est déroulé sans problème.</p>\n";
 		} else {
@@ -213,16 +271,9 @@ switch ($_['action']){
 				."réimportés&nbsp;:</h3>\n<ul>\n";
 			foreach($opml->alreadyKnowns as $alreadyKnown) {
 				foreach($alreadyKnown as &$elt) $elt = htmlspecialchars($elt);
-				$maxLength = 80;
-				$delimiter = '...';
-				if (strlen($alreadyKnown->description)>$maxLength) {
-					$alreadyKnown->description =
-						substr($alreadyKnown->description, 0,
-							$maxLength-strlen($delimiter)
-						).$delimiter;
-				}
+				$text = Functions::truncate($alreadyKnown->feedName, 60);
 				echo "<li><a target='_parent' href='{$alreadyKnown->xmlUrl}'>"
-					."{$alreadyKnown->description}</a></li>\n";
+					."{$text}</a></li>\n";
 			}
 			echo "</ul>\n";
 		}
