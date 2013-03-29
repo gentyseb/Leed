@@ -301,17 +301,20 @@ switch ($action){
 
 	
 	case 'addFeed':
-			require_once("SimplePie.class.php");
 			if($myUser==false) exit('Vous devez vous connecter pour cette action.');
-			if(isset($_['newUrl'])){
-				$newFeed = new Feed();
-				$newFeed->setUrl($_['newUrl']);
+			require_once("SimplePie.class.php");
+			if(!isset($_['newUrl'])) break;
+			$newFeed = new Feed();
+			$newFeed->setUrl($_['newUrl']);
+			if ($newFeed->notRegistered()) {
+				///@TODO: avertir l'utilisateur du doublon non ajouté
 				$newFeed->getInfos();
-				$newFeed->setFolder((isset($_['newUrlCategory'])?$_['newUrlCategory']:1));
-				$newFeed->save();
-				$newFeed->parse();
-				header('location: ./settings.php#defaultFolder');
+				$newFeed->setFolder(
+					(isset($_['newUrlCategory'])?$_['newUrlCategory']:1)
+				);
+				$newFeed->parse(true);
 			}
+ 			header('location: ./settings.php#defaultFolder');
 	break;
 
 	case 'changeFeedFolder':

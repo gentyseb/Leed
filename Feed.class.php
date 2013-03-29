@@ -30,6 +30,10 @@ class Feed extends MysqlEntity{
 		parent::__construct();
 	}
 
+	/** @TODO: ne faire qu'un seul chargement avec SimplePie et récupérer les
+	même informations. Mettre le chargement en cache au moins d'une méthode
+	loadLeed() qui ne chargera qu'une seule fois. Voire même en déclenchement
+	retardé, au dernier moment. */
 	function getInfos(){
 		$xml = @simplexml_load_file($this->url);
 		if($xml!=false){
@@ -47,6 +51,10 @@ class Feed extends MysqlEntity{
 	@TODO: SimplePie remplace "é" par "&eacute;", il ne devrait pas le faire.
 	J'ai testé set_stupidly_fast(true) sans succès.
 	Il encadre les descriptions avec <div>, absents dans le source du flux.
+	@TODO: la vérification de doublon est sous la responsabilité de l'appelant.
+	Il serait peut-être utile de faire une méthode add() qui vérifie, plante si
+	nécessaire, et appelle parse(). Impossible de vérifier dans parse() même
+	car elle est appelée aussi pour autre chose que l'ajout.
 	*/
 
 	function parse(){
@@ -134,7 +142,7 @@ class Feed extends MysqlEntity{
 
 		$eventManager->massiveInsert($events);
 		$this->lastupdate = $_SERVER['REQUEST_TIME'];
-		$this->save();
+		$this->save(); /// @TODO: save() à faire systématiquement ?
 		return true;
 	}
 
@@ -247,8 +255,12 @@ class Feed extends MysqlEntity{
 	function setLastupdate($lastupdate){
 		$this->lastupdate = $lastupdate;
 	}
-	
 
+
+	/** @returns vrai si l'url n'est pas déjà connue .*/
+	function notRegistered() {
+		return $this->rowCount(array('url' => $this->url)) == 0;
+	}
 
 }
 
