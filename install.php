@@ -201,7 +201,8 @@ if(isset($_['installButton'])){
 						<?php 
 
 						if(!is_writable('./')){
-							$test['Erreur'][]='Écriture impossible dans le repertoire Leed, veuillez ajouter les permissions en ecriture sur tout le dossier (sudo chmod 775 -R '.str_replace(basename(__FILE__),'',__FILE__).')';
+			
+							$test['Erreur'][]='Écriture impossible dans le répertoire Leed, veuillez ajouter les permissions en écriture sur tout le dossier (sudo chmod 777 -R '.str_replace(basename(__FILE__),'',__FILE__).', pensez à blinder les permissions par la suite)';
 						}else{
 							$test['Succès'][]='Permissions sur le dossier courant : OK';
 						}
@@ -285,7 +286,7 @@ if(isset($_['installButton'])){
 					<h2>Préferences</h2>
 					<p>Autoriser la lecture anonyme: <input type="radio" checked="checked" value="1" name="articleDisplayAnonymous">Oui <input type="radio" value="0" name="articleDisplayAnonymous">Non</p>
 					<h3 class="articleDetails">Nb: si vous choisissez cette option, les utilisateurs non authentifiés pourront consulter vos flux (sans pouvoir les marquer comme lu/non lu).</h3>
-					<p>Nombre d'articles par page : <input type="text" value="5" name="articlePerPages"></p>
+					<p>Nombre d'articles par pages: <input type="text" value="5" name="articlePerPages"></p>
 					<p>Affichage du lien direct de l'article: <input type="radio" checked="checked" value="1" name="articleDisplayLink">Oui <input type="radio" value="0" name="articleDisplayLink">Non</p>
 					<p>Affichage de la date de l'article: <input type="radio" checked="checked" value="1" name="articleDisplayDate">Oui <input type="radio" value="0" name="articleDisplayDate">Non</p>
 					<p>Affichage de l'auteur de l'article: <input type="radio" checked="checked" value="1" name="articleDisplayAuthor">Oui <input type="radio" value="0" name="articleDisplayAuthor">Non</p>
