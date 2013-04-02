@@ -258,12 +258,13 @@ switch ($action){
 
 	case 'importFeed':
 		// On ne devrait pas mettre de style ici.
-		echo '<link rel="stylesheet" href="templates/marigolds/css/style.css">
-		<style>
-		a{
-			color: #F16529;
-		}
-		</style>';
+		echo "
+			<style>
+				a {
+					color:#F16529;
+				}
+			</style>
+\n";
 		if($myUser==false) exit('Vous devez vous connecter pour cette action.');
 		if(!isset($_POST['importButton'])) break;
 		$opml = new Opml();
